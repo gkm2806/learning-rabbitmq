@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-
-	"github.com/julienschmidt/httprouter"
+	"time"
+	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
 )
@@ -14,22 +14,37 @@ var rabbit_host = os.Getenv("RABBIT_HOST")
 var rabbit_port = os.Getenv("RABBIT_PORT")
 var rabbit_user = os.Getenv("RABBIT_USERNAME")
 var rabbit_password = os.Getenv("RABBIT_PASSWORD")
+var publisher_port = os.Getenv("PUBLISHER_PORT")
+
+type chatMessage struct{
+	Id string `json:"id"`
+	ChatId string `json:"chatId"`
+	Content	string `json:"content"`
+	From string `json:"from"`
+	To string `json:"to"`
+	CreatedAt time.Time `json:"createdAt"`
+}
 
 func main() {
 
-	router := httprouter.New()
+	router := gin.Default()
 
-	router.POST("/:queue/:message", func(_ http.ResponseWriter, req *http.Request, params httprouter.Params) {
-		submit(req, params)
-	})
+	router.POST("/messages", submit)
 
-	fmt.Println("Running!...")
-	log.Fatal(http.ListenAndServe(":4000", router))
+	fmt.Println("Welcome aboard, Captain! All systems online")
+	fmt.Println("Running on 0.0.0.0:"+publisher_port)
+	router.Run("0.0.0.0:"+publisher_port)
 }
 
-func submit(request *http.Request, params httprouter.Params) {
-	message := params.ByName("message")
-	queueName := params.ByName("queue")
+func submit(c *gin.Context) {
+	var newMessage chatMessage
+	if err := c.BindJSON(&newMessage); err != nil {
+		return
+	}
+	fmt.Println("POST Message data: ", newMessage)
+
+	message := newMessage.Content
+	queueName := newMessage.ChatId
 
 	fmt.Println("Received message: " + message)
 
@@ -77,6 +92,7 @@ func submit(request *http.Request, params httprouter.Params) {
 	if publishErr != nil {
 		log.Fatalf("%s: %s", "Failed to publish a message", publishErr)
 	}
+	c.IndentedJSON(http.StatusCreated, newMessage)
 
 	fmt.Println("publish to queue successfully!")
 }
