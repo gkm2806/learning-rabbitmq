@@ -4,9 +4,9 @@ RUN apk add --no-cache git
 
 WORKDIR /src
 
-RUN go get github.com/julienschmidt/httprouter
-RUN go get github.com/sirupsen/logrus
-RUN go get github.com/streadway/amqp
+COPY go.mod ./
+COPY go.sum ./
+RUN go mod download
 
 COPY src/main.go /src 
 
